@@ -97,7 +97,7 @@ Indeed, start by $R_{b-1..b}, R_{b-2..b},\dots$
 In Algorithm~\ref{alg:dynp}, the output is the path matrix $M_{\text{path}}$ which is such that $M_{\text{path}}[t, k]$ is the last change point of the optimal segmentation with $k$ breaks of $y_{0..t}$.
 To recover the list of changes of $y$, for a given number $K$ of change points, one needs to iterate to return
 \begin{equation*}
-    t_K = M_{\text{path}}[T, K], t_{K-1}=M_{\text{path}}[t_K, K], t_{K-2}=M_{\text{path}}[t_{K-1}, K], \dots  
+    t_K = M_{\text{path}}[T, K], t_{K-1}=M_{\text{path}}[t_K, K-1], t_{K-2}=M_{\text{path}}[t_{K-1}, K-2], \dots  
 \end{equation*}
 
 \begin{algorithm}
@@ -131,14 +131,14 @@ To recover the list of changes of $y$, for a given number $K$ of change points, 
         \STATE $M_{V}[t, 0] \gets D[t] - S[0]/t$ \COMMENT{Recall that $M_{V}[t, 0]=V_0(y_{0..t})=c(y_{0..t})$}
         \FORALL{$k=1,\dots,\min(K, t-1)$}
         \FORALL{$s=k,\dots,t-1$}
-        \STATE $c_{\text{current}} \gets D[t]-D[s] + S[s]/(t-s)$ \COMMENT{$=c(y_{s..t})$}
+        \STATE $c_{\text{current}} \gets D[t]-D[s] - S[s]/(t-s)$ \COMMENT{$=c(y_{s..t})$}
         \STATE $v_{\text{current}} \gets M_V[s, k-1] + c_{\text{current}}$ \COMMENT{$=V_{k-1}(y_{0..s})+c(y_{s..t})$}
         \IF{$s=k$}
-        \STATE $M_V[s, k] \gets v_{\text{current}}$
+        \STATE $M_V[t, k] \gets v_{\text{current}}$
         \STATE $M_{\text{path}}[t, k] \gets s$
         \ELSE
-        \IF{$M_V[s, k]>v_{\text{current}}$}
-        \STATE $M_V[s, k] \gets v_{\text{current}}$
+        \IF{$M_V[t, k]>v_{\text{current}}$}
+        \STATE $M_V[t, k] \gets v_{\text{current}}$
         \STATE $M_{\text{path}}[t, k] \gets s$
         \ENDIF
         \ENDIF
