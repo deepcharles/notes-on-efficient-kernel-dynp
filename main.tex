@@ -1,0 +1,155 @@
+\title{Pseudo-code for the efficient kernel change point detection}
+\author{
+        Charles Truong
+}
+\date{}
+
+\documentclass[12pt]{article}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{algorithm}
+\usepackage{algorithmic} 
+\usepackage{bm}
+
+\newcommand\maxop{{\max}_\Omega}
+\newcommand\vecc{\text{vec}\,}
+\newcommand\RR{\mathbb{R}}
+\newcommand\NN{\mathbb{N}}
+\newcommand\HH{\mathcal{H}}
+\newcommand{\norm}[1]{\left\lVert#1\right\rVert}
+\newcommand{\sca}[2]{\left\langle#1\mid #2\right\rangle}
+\newcommand{\pluseq}{\mathrel{+}=}
+\newcommand{\TT}{\mathcal{T}}
+\newcommand{\TThat}{\widehat{\mathcal{T}}}
+\DeclareMathOperator*{\argmin}{arg\,min}
+
+\begin{document}
+\maketitle
+
+\section{Introduction}
+In the following, $y=\{y_t\}_{t=0}^{T-1}$ denotes a $\RR^d$-valued signal with $T$ samples.
+The original signal $y$ is mapped onto a reproducing Hilbert space (rkhs) $\HH$ associated with a user-defined kernel function $k(\cdot, \cdot):\RR^d\times\RR^d \leftarrow \RR$.
+The mapping function $\phi:\RR^d \leftarrow\HH$ onto this rkhs is implicitly defined by $\phi(y_t)=k(y_t, \cdot)\in\HH$, resulting in the following inner-product and norm:
+\begin{equation}
+    \sca{\phi(y_s)}{\phi(y_t)}_\HH = k(y_s, y_t) \quad\text{and}\quad \norm{\phi(y_t)}_\HH = k(y_t, y_t)
+\end{equation}
+for any samples $y_s, y_t\in\RR^d$.
+
+\paragraph{Notations.}
+For two indexes $a$ and $b$ ($a<b$), $y_{a..b} = \{y_a,y_{a+1},\dots,y_{b-1}\}$ is the sub-signal between $a$ (included) and $b$ (excluded).
+(For instance, $y_{0..T}$ is the entire signal.)
+A set of $K$ change points is denoted $\TT=\{t_1,t_2,\dots,t_K\}$ and its cardinal is $|\TT|$.
+By convention, $t_0=0$ and $t_{|\TT|+1}=T$.
+
+\section{Related work}
+
+\cite{Celisse2017}
+
+\section{Problem formulation}
+For this segmentation task, the cost function $c(\cdot)$ is given by
+\begin{equation}
+    c(y_{a..b}) := \sum_{t=a}^{b-1} \norm{\phi(y_t) - \mu_{a..b}}_{\HH}^2 = \sum_{t=a}^{b-1} \norm{\phi(y_t)}_{\HH}^2 - \frac{1}{b-a}\norm{\sum_{t=a}^{b-1} \phi(y_t)}^2_\HH
+\end{equation}
+where $\mu_{a..b} = (\sum_{t=a}^{b-1} \phi(y_t))/(b-a)$.
+It is easy to see that $c(\cdot)$ can be rewritten using only the kernel $k(\cdot, \cdot)$:
+\begin{equation}
+    c(y_{a..b}) = \sum_{t=a}^{b-1} k(y_t, y_t) - \frac{1}{b-a} \sum_{s,t=a}^{b-1} k(y_s,y_t).
+\end{equation}
+The best segmentation (i.e.\ the best set of change points) with $K$ ($K>1$) breaks is denoted $\TThat_K$, defined by 
+\begin{equation}
+    \TThat_K := \argmin_{\TT, |\TT|=K} V(y_{0..T}, \TT)\quad\text{where}\quad V(y_{0..T}, \TT):= \sum_{k=0}^{K} c(y_{t_k..t_{k+1}}).
+\end{equation}
+Let $V_K(y_{0..T})$ be the minimum sum of costs for $K$ changes points:
+\begin{equation}
+    V_K(y_{0..T}) := V(y_{0..T}, \TThat_K) \quad\text{for } K\geq1.
+\end{equation}
+By convention,
+\begin{equation}
+    V_0(y_{a..b}) := c(y_{a..b}).
+\end{equation}
+The following equality is at the heart of the dynamic programming formulation:
+\begin{equation}
+    V_K(y_{0..T}) = \min_{t=K,..,T-1} \left[V_{K-1}(y_{0..t}) + c(y_{t..T})\right].
+\end{equation}
+
+\section{Pseudo-code}
+Rewrite the cost function using two easily computable quantities:
+\begin{equation}
+    c(y_{a..b}) = D_{a..b} - \frac{1}{b-a} S_{a..b}
+\end{equation}
+where
+\begin{equation}
+    D_{a..b} := \sum_{t=a}^{b-1} k(y_t, y_t) \quad\text{and}\quad S_{a..b} := \sum_{s,t=a}^{b-1} k(y_s,y_t).
+\end{equation}
+(Note that $D_{a..a}=0$ and $S_{a..a}=0$.)
+Both $D_{a..b}$ and $S_{a..b}$ can be computed iteratively, thanks to the following identities:
+\begin{equation}
+    S_{a..b+1} = S_{a..b} -k(y_b, y_{b}) + 2 R_{a..b+1} \quad\text{where}\quad R_{a..b} :=\sum_{s=a}^{b-1} k(y_{b-1}, y_s)
+\end{equation}
+as well as
+\begin{equation}
+    D_{a..b} = D_{0..b} - D_{0..a}\quad\text{and}\quad D_{0..b+1} = D_{0..b} + k(y_b, y_b).
+\end{equation}
+Note that, for a fixed $b$, $R_{a..b}$ (for $a=0,\dots,b-1$) can be computed iteratively in $\mathcal{O}(b)$ operations since $R_{a..b} = R_{a+1..b} + k(y_a, y_{b-1})$.
+Indeed, start by $R_{b-1..b}, R_{b-2..b},\dots$
+\\
+In Algorithm~\ref{alg:dynp}, the output is the path matrix $M_{\text{path}}$ which is such that $M_{\text{path}}[t, k]$ is the last change point of the optimal segmentation with $k$ breaks of $y_{0..t}$.
+To recover the list of changes of $y$, for a given number $K$ of change points, one needs to iterate to return
+\begin{equation*}
+    t_K = M_{\text{path}}[T, K], t_{K-1}=M_{\text{path}}[t_K, K], t_{K-2}=M_{\text{path}}[t_{K-1}, K], \dots  
+\end{equation*}
+
+\begin{algorithm}
+    \small
+    \caption{Compute the best segmentation with $K$ change points} % give the algorithm a caption
+    \label{alg:dynp} % and a label for \ref{} commands later in the document
+    \begin{algorithmic} % enter the algorithmic environment
+        \REQUIRE Signal $y = \{y_t\}_t$ with $T$ samples, number $K$ of change points
+        \STATE \COMMENT{Initialize arrays}
+        \STATE $D \gets \bm{0}\in\mathbb{R}^{T+1}$ \COMMENT{sub-sums $D_{0..t}$}
+        \STATE $S \gets \bm{0}\in\mathbb{R}^{T+1}$ \COMMENT{sub-sums $S_{s..t}$}
+        \STATE $M_V \gets \bm{0}\in\mathbb{R}^{(K+1)\times (T+1)}$ \COMMENT{cost matrix, to hold sums of costs}
+        \STATE $M_{\text{path}} \gets \bm{0}\in\mathbb{R}^{(K+1)\times (T+1)}$ \COMMENT{path matrix, to hold the change point indexes}
+        \STATE $c_{\text{current}}, v_{\text{current}}, r_{\text{current}}\in\RR$ \COMMENT{current cost, sum of costs, and $R_{s..t}$}
+        % -----------------------------------------------------------------------------------------
+        \STATE
+        \FORALL{$t=1,\dots,T$}
+        \STATE \COMMENT{handle $y_{0..t}=\{y_0,\dots,y_{t-1}\}$}
+        \STATE
+        \STATE \COMMENT{Compute $D[t]$}
+        \STATE $D[t] \gets D[t-1] + k(y_{t-1}, y_{t-1})$ \COMMENT{$D[t]=D_{0..t}$}
+        \STATE
+        \STATE \COMMENT{Compute $S[t-1],S[t-2],\dots,S[0]$}
+        \STATE $r_{\text{current}}\gets0$
+        \FORALL{$s=t-1,\dots,0$}
+        \STATE $r_{\text{current}} \gets r_{\text{current}} + k(y_{s}, y_{t-1})$ \COMMENT{$r_{\text{current}}=R_{s..t}$}
+        \STATE $S[s] \gets S[s] - k(y_{t-1}, y_{t-1}) + 2\times r_{\text{current}}$ \COMMENT{$S[s]=S_{s..t}$}
+        \ENDFOR
+        \STATE
+        \STATE \COMMENT{Compute segmentations}
+        \STATE $M_{V}[t, 0] \gets D[t] - S[0]/t$ \COMMENT{Recall that $M_{V}[t, 0]=V_0(y_{0..t})=c(y_{0..t})$}
+        \FORALL{$k=1,\dots,\min(K, t-1)$}
+        \FORALL{$s=k,\dots,t-1$}
+        \STATE $c_{\text{current}} \gets D[t]-D[s] + S[s]/(t-s)$ \COMMENT{$=c(y_{s..t})$}
+        \STATE $v_{\text{current}} \gets M_V[s, k-1] + c_{\text{current}}$ \COMMENT{$=V_{k-1}(y_{0..s})+c(y_{s..t})$}
+        \IF{$s=k$}
+        \STATE $M_V[s, k] \gets v_{\text{current}}$
+        \STATE $M_{\text{path}}[t, k] \gets s$
+        \ELSE
+        \IF{$M_V[s, k]>v_{\text{current}}$}
+        \STATE $M_V[s, k] \gets v_{\text{current}}$
+        \STATE $M_{\text{path}}[t, k] \gets s$
+        \ENDIF
+        \ENDIF
+        \ENDFOR
+        \ENDFOR
+        \ENDFOR
+        \RETURN $M_{\text{path}}$
+    \end{algorithmic}
+\end{algorithm}
+
+\bibliographystyle{abbrv}
+\bibliography{biblio}
+
+\end{document}
