@@ -206,7 +206,7 @@ The minimization~\eqref{eq:min-sum-of-cost} is done over the admissible segmenta
         \STATE
         \STATE \COMMENT{Compute segmentations}
         \STATE $M_{V}[q_t, 0] \gets D[q_t] - S_{\text{diag}}[q_t]/(q_t\delta)$ \COMMENT{Recall that $M_{V}[q_t, 0]=c(y_{0..q_t\delta})$}
-        \FORALL{$q_s=1,\dots,q_t-\floor{\Delta-1/\delta}-1$}
+        \FORALL{$q_s=1,\dots,q_t-\floor{(\Delta-1)/\delta}-1$}
         \STATE $c_{\text{current}} \gets D[q_t]-D[q_s] - (S_{\text{diag}}[q_t]+S_{\text{diag}}[q_s]-2S_{\text{off-diag}}[q_s])/(q_t\delta-q_s\delta)$ \COMMENT{$=c(y_{s..t})$}
         \FORALL{$k=1,\dots,\min(K, q_s)$}
         \STATE $v_{\text{current}} \gets M_V[q_s, k-1] + c_{\text{current}}$ \COMMENT{$=V_{k-1}(y_{0..q_s\delta})+c(y_{q_s\delta..q_t\delta})$}
