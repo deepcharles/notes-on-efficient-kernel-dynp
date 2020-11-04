@@ -11,6 +11,7 @@
 \usepackage{algorithm}
 \usepackage{algorithmic} 
 \usepackage{bm}
+\usepackage{mathtools}
 
 \newcommand\maxop{{\max}_\Omega}
 \newcommand\vecc{\text{vec}\,}
@@ -23,6 +24,9 @@
 \newcommand{\TT}{\mathcal{T}}
 \newcommand{\TThat}{\widehat{\mathcal{T}}}
 \DeclareMathOperator*{\argmin}{arg\,min}
+\newcommand{\sslash}{\mathbin{/\mkern-6mu/}}
+\DeclarePairedDelimiter\ceil{\lceil}{\rceil}
+\DeclarePairedDelimiter\floor{\lfloor}{\rfloor}
 
 \begin{document}
 \maketitle
@@ -41,6 +45,7 @@ For two indexes $a$ and $b$ ($a<b$), $y_{a..b} = \{y_a,y_{a+1},\dots,y_{b-1}\}$ 
 (For instance, $y_{0..T}$ is the entire signal.)
 A set of $K$ change points is denoted $\TT=\{t_1,t_2,\dots,t_K\}$ and its cardinal is $|\TT|$.
 By convention, $t_0=0$ and $t_{|\TT|+1}=T$.
+Denote by $\sslash $ the integer division, i.e.\ $a\sslash b= \floor{a/b}$ where $\floor{\cdot}$ is the floor function.
 
 \section{Related work}
 
@@ -59,6 +64,7 @@ It is easy to see that $c(\cdot)$ can be rewritten using only the kernel $k(\cdo
 The best segmentation (i.e.\ the best set of change points) with $K$ ($K>1$) breaks is denoted $\TThat_K$, defined by 
 \begin{equation}
     \TThat_K := \argmin_{\TT, |\TT|=K} V(y_{0..T}, \TT)\quad\text{where}\quad V(y_{0..T}, \TT):= \sum_{k=0}^{K} c(y_{t_k..t_{k+1}}).
+    \label{eq:min-sum-of-cost}
 \end{equation}
 Let $V_K(y_{0..T})$ be the minimum sum of costs for $K$ changes points:
 \begin{equation}
@@ -74,31 +80,46 @@ The following equality is at the heart of the dynamic programming formulation:
 \end{equation}
 
 \section{Pseudo-code}
+
+\paragraph{Rewrite the cost.}
 Rewrite the cost function using two easily computable quantities:
 \begin{equation}
-    c(y_{a..b}) = D_{a..b} - \frac{1}{b-a} S_{a..b}
+    c(y_{a..b}) = D_{a..b} - \frac{1}{b-a} S_{a..b, a..b}
 \end{equation}
 where
 \begin{equation}
-    D_{a..b} := \sum_{t=a}^{b-1} k(y_t, y_t) \quad\text{and}\quad S_{a..b} := \sum_{s,t=a}^{b-1} k(y_s,y_t).
+    D_{a..b} := \sum_{t=a}^{b-1} k(y_t, y_t) \quad\text{and}\quad S_{a..b, a'..b'} := \sum_{a\leq s <b} \sum_{a'\leq t <b'} k(y_s, y_t).
 \end{equation}
-(Note that $D_{a..a}=0$ and $S_{a..a}=0$.)
-Both $D_{a..b}$ and $S_{a..b}$ can be computed iteratively, thanks to the following identities:
+(Note that $D_{a..a}=0$ and $S_{a..a, a'..b'}=S_{a..b, a'..a'}=0$.)
+It is easy to see that
 \begin{equation}
-    S_{a..b+1} = S_{a..b} -k(y_b, y_{b}) + 2 R_{a..b+1} \quad\text{where}\quad R_{a..b} :=\sum_{s=a}^{b-1} k(y_{b-1}, y_s)
+    S_{a..b, a..b} = S_{0..a, 0..a} + S_{0..b, 0..b} - 2S_{0..a, 0..b}.
+\end{equation}
+Both $D_{a..b}$ and $S_{a..b, a..b}$ can be computed iteratively, thanks to the following identities:
+\begin{equation}
+    S_{0..a, 0..b+1} = S_{0..a, 0..b} + S_{0..a, b..b+1}\quad\text{and}\quad S_{0..a+1, b..b+1} = S_{0..a, b..b+1} + k(x_a, x_b)
 \end{equation}
 as well as
 \begin{equation}
     D_{a..b} = D_{0..b} - D_{0..a}\quad\text{and}\quad D_{0..b+1} = D_{0..b} + k(y_b, y_b).
 \end{equation}
-Note that, for a fixed $b$, $R_{a..b}$ (for $a=0,\dots,b-1$) can be computed iteratively in $\mathcal{O}(b)$ operations since $R_{a..b} = R_{a+1..b} + k(y_a, y_{b-1})$.
-Indeed, start by $R_{b-1..b}, R_{b-2..b},\dots$
-\\
+
+\paragraph{The path matrix.}
 In Algorithm~\ref{alg:dynp}, the output is the path matrix $M_{\text{path}}$ which is such that $M_{\text{path}}[t, k]$ is the last change point of the optimal segmentation with $k$ breaks of $y_{0..t}$.
 To recover the list of changes of $y$, for a given number $K$ of change points, one needs to iterate to return
 \begin{equation*}
     t_K = M_{\text{path}}[T, K], t_{K-1}=M_{\text{path}}[t_K, K-1], t_{K-2}=M_{\text{path}}[t_{K-1}, K-2], \dots  
 \end{equation*}
+
+\paragraph{Jump and minimum segment size.}
+In order to decrease the complexity, the change point detection can be restricted to a subset of indexes.
+Denote the jump by $\delta$ and the minimum segment size by $\Delta$.
+The minimization~\eqref{eq:min-sum-of-cost} is done over the admissible segmentations $\TT=\{t_1,t_2,\dots,t_K\}$ such that
+\begin{equation}
+    t_k \text{ is a multiple of }\delta\text{ and } t_{k+1}-t_k \geq \Delta.
+\end{equation}
+
+
 
 \begin{algorithm}
     \small
@@ -109,8 +130,8 @@ To recover the list of changes of $y$, for a given number $K$ of change points, 
         \STATE \COMMENT{Initialize arrays}
         \STATE $D \gets \bm{0}\in\mathbb{R}^{T+1}$ \COMMENT{sub-sums $D_{0..t}$}
         \STATE $S \gets \bm{0}\in\mathbb{R}^{T+1}$ \COMMENT{sub-sums $S_{s..t}$}
-        \STATE $M_V \gets \bm{0}\in\mathbb{R}^{(K+1)\times (T+1)}$ \COMMENT{cost matrix, to hold sums of costs}
-        \STATE $M_{\text{path}} \gets \bm{0}\in\mathbb{R}^{(K+1)\times (T+1)}$ \COMMENT{path matrix, to hold the change point indexes}
+        \STATE $M_V \gets \bm{0}\in\mathbb{R}^{(T+1)\times (K+1)}$ \COMMENT{cost matrix, to hold sums of costs}
+        \STATE $M_{\text{path}} \gets \bm{0}\in\mathbb{R}^{(T+1)\times (K+1)}$ \COMMENT{path matrix, to hold the change point indexes}
         \STATE $c_{\text{current}}, v_{\text{current}}, r_{\text{current}}\in\RR$ \COMMENT{current cost, sum of costs, and $R_{s..t}$}
         % -----------------------------------------------------------------------------------------
         \STATE
@@ -129,9 +150,9 @@ To recover the list of changes of $y$, for a given number $K$ of change points, 
         \STATE
         \STATE \COMMENT{Compute segmentations}
         \STATE $M_{V}[t, 0] \gets D[t] - S[0]/t$ \COMMENT{Recall that $M_{V}[t, 0]=V_0(y_{0..t})=c(y_{0..t})$}
-        \FORALL{$k=1,\dots,\min(K, t-1)$}
-        \FORALL{$s=k,\dots,t-1$}
+        \FORALL{$s=1,\dots,t-1$}
         \STATE $c_{\text{current}} \gets D[t]-D[s] - S[s]/(t-s)$ \COMMENT{$=c(y_{s..t})$}
+        \FORALL{$k=1,\dots,\min(K, s)$}
         \STATE $v_{\text{current}} \gets M_V[s, k-1] + c_{\text{current}}$ \COMMENT{$=V_{k-1}(y_{0..s})+c(y_{s..t})$}
         \IF{$s=k$}
         \STATE $M_V[t, k] \gets v_{\text{current}}$
@@ -148,6 +169,63 @@ To recover the list of changes of $y$, for a given number $K$ of change points, 
         \RETURN $M_{\text{path}}$
     \end{algorithmic}
 \end{algorithm}
+
+
+\begin{algorithm}
+    \scriptsize
+    \caption{Compute the best segmentation with $K$ change points (with jump and minimum segment size)} % give the algorithm a caption
+    \label{alg:dynp_jump_min_size} % and a label for \ref{} commands later in the document
+    \begin{algorithmic} % enter the algorithmic environment
+        \REQUIRE Signal $y = \{y_t\}_t$ with $T$ samples, number $K$ of change points, jump $\delta$, minimum segment size $\Delta$
+        \STATE \COMMENT{Initialize}
+        \STATE $q\gets \ceil{T/\delta}$ \COMMENT{ceil function}
+        \STATE $D \gets \bm{0}\in\mathbb{R}^{q+1}$ \COMMENT{sub-sums $D_{0..t}$}
+        \STATE $S_{\text{off-diag}} \gets \bm{0}\in\mathbb{R}^{q+1}$ \COMMENT{sub-sums $S_{0..s, 0..t}$}
+        \STATE $S_{\text{diag}} \gets \bm{0}\in\mathbb{R}^{q+1}$ \COMMENT{sub-sums $S_{0..t, 0..t}$}
+        \STATE $M_V \gets \bm{0}\in\mathbb{R}^{(q+1)\times (K+1)}$ \COMMENT{cost matrix, to hold sums of costs}
+        \STATE $M_{\text{path}} \gets \bm{0}\in\mathbb{R}^{(q+1)\times (K+1)}$ \COMMENT{path matrix, to hold the change point indexes}
+        \STATE $d_{\text{current}},s_{\text{current}}\gets0$ \COMMENT{accumulator variables for $D_{0..t}$ and $S_{0..s, 0..t}$}
+        \STATE $c_{\text{current}}, v_{\text{current}}\in\RR$ \COMMENT{current cost, sum of costs}
+        % -----------------------------------------------------------------------------------------
+        \STATE
+        \FORALL{$q_t=1,\dots,q$}
+        \FORALL{$t=(q_t-1)\delta+1,\dots,\min(q_t\delta,T)$}
+        \STATE $d_{\text{current}}\gets d_{\text{current}} + k(y_{t-1}, y_{t-1})$
+        \STATE \COMMENT{Update $S_{\text{off-diag}}[1],S_{\text{off-diag}}[2],\dots,S_{\text{off-diag}}[q_t]$}
+        \STATE $acc\gets0$
+        \FORALL{$q_s=1,\dots,q_t$}
+        \FORALL{$s=(q_s-1)\delta+1,\dots,\min(q_s\delta, t)$}
+        \STATE $acc \gets acc + k(y_{s-1}, y_{t-1})$
+        \ENDFOR
+        \STATE $S_{\text{off-diag}}[q_s] \gets S_{\text{off-diag}}[q_s] + acc$ \COMMENT{$S_{\text{off-diag}}[q_s]=S_{0..q_s\delta, 0..q_t\delta}$}
+        \ENDFOR
+        \ENDFOR
+        \STATE $D[q_t] \gets d_{\text{current}}$ \COMMENT{$D[q_t]=D_{0..q_t\delta}$}
+        \STATE $S_{\text{diag}}[q_t] \gets S_{\text{off-diag}}[q_t]$
+
+        \STATE
+        \STATE \COMMENT{Compute segmentations}
+        \STATE $M_{V}[q_t, 0] \gets D[q_t] - S_{\text{diag}}[q_t]/(q_t\delta)$ \COMMENT{Recall that $M_{V}[q_t, 0]=c(y_{0..q_t\delta})$}
+        \FORALL{$q_s=1,\dots,q_t-\floor{\Delta-1/\delta}-1$}
+        \STATE $c_{\text{current}} \gets D[q_t]-D[q_s] - (S_{\text{diag}}[q_t]+S_{\text{diag}}[q_s]-2S_{\text{off-diag}}[q_s])/(q_t\delta-q_s\delta)$ \COMMENT{$=c(y_{s..t})$}
+        \FORALL{$k=1,\dots,\min(K, q_s)$}
+        \STATE $v_{\text{current}} \gets M_V[q_s, k-1] + c_{\text{current}}$ \COMMENT{$=V_{k-1}(y_{0..q_s\delta})+c(y_{q_s\delta..q_t\delta})$}
+        \IF{$q_s=k$}
+        \STATE $M_V[q_t, k] \gets v_{\text{current}}$
+        \STATE $M_{\text{path}}[q_t, k] \gets q_s$
+        \ELSE
+        \IF{$M_V[q_t, k]>v_{\text{current}}$}
+        \STATE $M_V[q_t, k] \gets v_{\text{current}}$
+        \STATE $M_{\text{path}}[q_t, k] \gets q_s$
+        \ENDIF
+        \ENDIF
+        \ENDFOR
+        \ENDFOR
+        \ENDFOR
+        \RETURN $M_{\text{path}}$
+    \end{algorithmic}
+\end{algorithm}
+
 
 \bibliographystyle{abbrv}
 \bibliography{biblio}
