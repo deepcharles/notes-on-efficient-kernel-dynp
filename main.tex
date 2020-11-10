@@ -189,20 +189,24 @@ The minimization~\eqref{eq:min-sum-of-cost} is done over the admissible segmenta
         % -----------------------------------------------------------------------------------------
         \STATE
         \FORALL{$q_t=1,\dots,q$}
+        \STATE $S_{\text{off-diag}}[q_t]\gets S_{\text{off-diag}}[q_t-1]$
         \FORALL{$t=(q_t-1)\delta+1,\dots,\min(q_t\delta,T)$}
         \STATE $d_{\text{current}}\gets d_{\text{current}} + k(y_{t-1}, y_{t-1})$
         \STATE \COMMENT{Update $S_{\text{off-diag}}[1],S_{\text{off-diag}}[2],\dots,S_{\text{off-diag}}[q_t]$}
         \STATE $acc\gets0$
-        \FORALL{$q_s=1,\dots,q_t$}
-        \FORALL{$s=(q_s-1)\delta+1,\dots,\min(q_s\delta, t)$}
+        \FORALL{$q_s=1,\dots,q_t-1$}
+        \FORALL{$s=(q_s-1)\delta+1,\dots,q_s\delta$}
         \STATE $acc \gets acc + k(y_{s-1}, y_{t-1})$
         \ENDFOR
         \STATE $S_{\text{off-diag}}[q_s] \gets S_{\text{off-diag}}[q_s] + acc$ \COMMENT{$S_{\text{off-diag}}[q_s]=S_{0..q_s\delta, 0..q_t\delta}$}
         \ENDFOR
+        \FORALL{$s=(q_t-1)\delta+1,\dots t-1$}
+        \STATE $acc \gets acc + k(y_{s-1}, y_{t-1})$
+        \ENDFOR
+        \STATE $S_{\text{off-diag}}[q_t] \gets S_{\text{off-diag}}[q_t] + 2\times acc +  k(y_{t-1}, y_{t-1})$
         \ENDFOR
         \STATE $D[q_t] \gets d_{\text{current}}$ \COMMENT{$D[q_t]=D_{0..q_t\delta}$}
         \STATE $S_{\text{diag}}[q_t] \gets S_{\text{off-diag}}[q_t]$
-
         \STATE
         \STATE \COMMENT{Compute segmentations}
         \STATE $M_{V}[q_t, 0] \gets D[q_t] - S_{\text{diag}}[q_t]/(q_t\delta)$ \COMMENT{Recall that $M_{V}[q_t, 0]=c(y_{0..q_t\delta})$}
