@@ -61,7 +61,7 @@ It is easy to see that $c(\cdot)$ can be rewritten using only the kernel $k(\cdo
 \begin{equation}
     c(y_{a..b}) = \sum_{t=a}^{b-1} k(y_t, y_t) - \frac{1}{b-a} \sum_{s,t=a}^{b-1} k(y_s,y_t).
 \end{equation}
-The best segmentation (i.e.\ the best set of change points) with $K$ ($K>1$) breaks is denoted $\TThat_K$, defined by 
+The best segmentation (i.e.\ the best set of change points) with $K$ ($K>1$) breaks is denoted $\TThat_K$, defined by
 \begin{equation}
     \TThat_K := \argmin_{\TT, |\TT|=K} V(y_{0..T}, \TT)\quad\text{where}\quad V(y_{0..T}, \TT):= \sum_{k=0}^{K} c(y_{t_k..t_{k+1}}).
     \label{eq:min-sum-of-cost}
@@ -108,7 +108,7 @@ as well as
 In Algorithm~\ref{alg:dynp}, the output is the path matrix $M_{\text{path}}$ which is such that $M_{\text{path}}[t, k]$ is the last change point of the optimal segmentation with $k$ breaks of $y_{0..t}$.
 To recover the list of changes of $y$, for a given number $K$ of change points, one needs to iterate to return
 \begin{equation*}
-    t_K = M_{\text{path}}[T, K], t_{K-1}=M_{\text{path}}[t_K, K-1], t_{K-2}=M_{\text{path}}[t_{K-1}, K-2], \dots  
+    t_K = M_{\text{path}}[T, K], t_{K-1}=M_{\text{path}}[t_K, K-1], t_{K-2}=M_{\text{path}}[t_{K-1}, K-2], \dots
 \end{equation*}
 
 \paragraph{Jump and minimum segment size.}
@@ -120,10 +120,9 @@ The minimization~\eqref{eq:min-sum-of-cost} is done over the admissible segmenta
 \end{equation}
 
 
-
 \begin{algorithm}
     \small
-    \caption{Compute the best segmentation with $K$ change points} % give the algorithm a caption
+    \caption{Compute the best segmentation with $K$ change points}
     \label{alg:dynp} % and a label for \ref{} commands later in the document
     \begin{algorithmic} % enter the algorithmic environment
         \REQUIRE Signal $y = \{y_t\}_t$ with $T$ samples, number $K$ of change points
@@ -173,7 +172,7 @@ The minimization~\eqref{eq:min-sum-of-cost} is done over the admissible segmenta
 
 \begin{algorithm}
     \scriptsize
-    \caption{Compute the best segmentation with $K$ change points (with jump and minimum segment size)} % give the algorithm a caption
+    \caption{Compute the best segmentation with $K$ change points (with jump and minimum segment size)}
     \label{alg:dynp_jump_min_size} % and a label for \ref{} commands later in the document
     \begin{algorithmic} % enter the algorithmic environment
         \REQUIRE Signal $y = \{y_t\}_t$ with $T$ samples, number $K$ of change points, jump $\delta$, minimum segment size $\Delta$
@@ -229,6 +228,110 @@ The minimization~\eqref{eq:min-sum-of-cost} is done over the admissible segmenta
         \RETURN $M_{\text{path}}$
     \end{algorithmic}
 \end{algorithm}
+
+
+\begin{equation}
+    S_{s..t} = S_{s..t-1} - k(y_{t-1}, y_{t-1}) + 2\sum_{u=s}^{t-1} k(y_{t-1}, y_u)
+\end{equation}
+\begin{algorithm}
+    \small
+    \caption{Compute the best segmentation with $K$ change points}
+    \label{alg:dynp_min_size} % and a label for \ref{} commands later in the document
+    \begin{algorithmic} % enter the algorithmic environment
+        \REQUIRE Signal $y = \{y_t\}_t$ with $T$ samples, number $K$ of change points, minimum segment size $\Delta$
+        \STATE \COMMENT{Initialize arrays}
+        \STATE $D \gets \bm{0}\in\mathbb{R}^{T+1}$ \COMMENT{sub-sums $D_{0..t}$}
+        \STATE $S \gets \bm{0}\in\mathbb{R}^{T+1}$ \COMMENT{sub-sums $S_{s..t}$}
+        \STATE $M_V \gets \bm{0}\in\mathbb{R}^{(T+1)\times (K+1)}$ \COMMENT{cost matrix, to hold sums of costs}
+        \STATE $M_{\text{path}} \gets \bm{0}\in\mathbb{R}^{(T+1)\times (K+1)}$ \COMMENT{path matrix, to hold the change point indexes}
+        \STATE $c_{\text{current}}, v_{\text{current}}, r_{\text{current}}\in\RR$ \COMMENT{current cost, sum of costs, and $R_{s..t}$}
+        % -----------------------------------------------------------------------------------------
+        \STATE
+        \FORALL{$t=1,\dots,T$}
+        \STATE \COMMENT{handle $y_{0..t}=\{y_0,\dots,y_{t-1}\}$}
+        \STATE
+        \STATE \COMMENT{Compute $D[t]$}
+        \STATE $D[t] \gets D[t-1] + k(y_{t-1}, y_{t-1})$ \COMMENT{$D[t]=D_{0..t}$}
+        \STATE
+        \STATE \COMMENT{Compute $S[t-1],S[t-2],\dots,S[0]$}
+        \STATE $r_{\text{current}}\gets0$
+        \FORALL{$s=t-1,\dots,0$}
+        \STATE $r_{\text{current}} \gets r_{\text{current}} + k(y_{s}, y_{t-1})$ \COMMENT{$r_{\text{current}}=R_{s..t}$}
+        \STATE $S[s] \gets S[s] + 2\times r_{\text{current}} - k(y_{t-1}, y_{t-1}) $ \COMMENT{$S[s]=S_{s..t}$}
+        \ENDFOR
+        \STATE
+        \STATE \COMMENT{Compute segmentations}
+        \STATE $M_{V}[t, 0] \gets D[t] - S[0]/t$ \COMMENT{Recall that $M_{V}[t, 0]=V_0(y_{0..t})=c(y_{0..t})$}
+        \FORALL{$s=\Delta,\dots,t-\Delta$}
+        \STATE $c_{\text{current}} \gets D[t]-D[s] - S[s]/(t-s)$ \COMMENT{$=c(y_{s..t})$}
+        \FORALL{$k=1,\dots,\min(K, \floor{s/\Delta})$}
+        \STATE $v_{\text{current}} \gets M_V[s, k-1] + c_{\text{current}}$ \COMMENT{$=V_{k-1}(y_{0..s})+c(y_{s..t})$}
+        \IF{$s=k\Delta$}
+        \STATE $M_V[t, k] \gets v_{\text{current}}$
+        \STATE $M_{\text{path}}[t, k] \gets s$
+        \ELSE
+        \IF{$M_V[t, k]>v_{\text{current}}$}
+        \STATE $M_V[t, k] \gets v_{\text{current}}$
+        \STATE $M_{\text{path}}[t, k] \gets s$
+        \ENDIF
+        \ENDIF
+        \ENDFOR
+        \ENDFOR
+        \ENDFOR
+        \RETURN $M_{\text{path}}$
+    \end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}
+    \footnotesize
+    \caption{Compute the best penalized segmentation}
+    \label{alg:pelt_min_size} % and a label for \ref{} commands later in the document
+    \begin{algorithmic} % enter the algorithmic environment
+        \REQUIRE Signal $y = \{y_t\}_t$ with $T$ samples, linear smoothing term $\beta$, minimum segment size $\Delta$
+        \STATE \COMMENT{Initialize arrays}
+        \STATE $D \gets \bm{0}\in\mathbb{R}^{T+1}$ \COMMENT{sub-sums $D_{0..t}$}
+        \STATE $S \gets \bm{0}\in\mathbb{R}^{T+1}$ \COMMENT{sub-sums $S_{s..t}$}
+        \STATE $M_V \gets \bm{0}\in\mathbb{R}^{(T+1)}$ \COMMENT{cost matrix, to hold sums of costs}
+        \STATE $M_{pruning} \gets \bm{0}\in\mathbb{R}^{(T+1)}$ \COMMENT{used for the pruning rule}
+        \STATE $M_{\text{path}} \gets \bm{0}\in\mathbb{R}^{(T+1)}$ \COMMENT{path matrix, to hold the change point indexes}
+        \STATE $c_{\text{current}}, v_{\text{current}}, r_{\text{current}}\in\RR$ \COMMENT{current cost, sum of costs, and $R_{s..t}$}
+        \STATE $s_{\text{min}}\gets \Delta$ \COMMENT{leftmost admissible change points}
+        % -----------------------------------------------------------------------------------------
+        \STATE
+        \STATE \COMMENT{handle $y_{0..t}=\{y_0,\dots,y_{t-1}\}$}
+        \FORALL{$t=1,\dots,T$}
+        \STATE $D[t] \gets D[t-1] + k(y_{t-1}, y_{t-1})$ \COMMENT{$D[t]=D_{0..t}$}
+        \STATE \COMMENT{Compute $S[t-1],S[t-2],\dots,S[s_{\text{min}}]$}
+        \STATE $r_{\text{current}}\gets0$
+        \FORALL{$s=t-1,\dots,s_{\text{min}}$}
+        \STATE $r_{\text{current}} \gets r_{\text{current}} + k(y_{s}, y_{t-1})$ \COMMENT{$r_{\text{current}}=R_{s..t}$}
+        \STATE $S[s] \gets S[s] + 2\times r_{\text{current}} - k(y_{t-1}, y_{t-1}) $ \COMMENT{$S[s]=S_{s..t}$}
+        \ENDFOR
+        \STATE \COMMENT{Compute segmentations}
+        \STATE $s\gets s_{\text{min}} $
+        \STATE $c_{\text{current}} \gets D[t]-D[s] - S[s]/(t-s)$ \COMMENT{$=c(y_{s..t})$}
+        \STATE $v_{\text{current}} \gets M_V[s] + c_{\text{current}} + \beta$ \COMMENT{$=V(y_{0..s})+c(y_{s..t})+\beta$}
+        \STATE $M_{\text{pruning}}[s] \gets M_V[s] + c_{\text{current}}$ \COMMENT{$=V(y_{0..s})+c(y_{s..t})$}
+        \STATE $M_V[t] \gets v_{\text{current}}$
+        \STATE $M_{\text{path}}[t] \gets s$
+        \FORALL{$s=s_{\text{min}}+1,\dots,t-\Delta$}
+        \STATE $c_{\text{current}} \gets D[t]-D[s] - S[s]/(t-s)$ \COMMENT{$=c(y_{s..t})$}
+        \STATE $v_{\text{current}} \gets M_V[s] + c_{\text{current}} + \beta$ \COMMENT{$=V(y_{0..s})+c(y_{s..t})+\beta$}
+        \STATE $M_{\text{pruning}}[s] \gets M_V[s] + c_{\text{current}}$
+        \IF{$M_V[t]>v_{\text{current}}$}
+        \STATE $M_V[t] \gets v_{\text{current}}$
+        \STATE $M_{\text{path}}[t] \gets s$
+        \ENDIF
+        \ENDFOR
+        \STATE \COMMENT{Pruning}
+        \WHILE{$M_{\text{pruning}}[s_{\text{min}}] \geq M_V[t]$ and $s_{\text{min}}\leq t-\Delta$}
+        \STATE $s_{\text{min}}\gets s_{\text{min}} + 1$
+        \ENDWHILE
+        \ENDFOR
+        \RETURN $M_{\text{path}}$
+    \end{algorithmic}
+\end{algorithm}
+
 
 
 \bibliographystyle{abbrv}
